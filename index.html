@@ -22,7 +22,7 @@
   .refresh-btn{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);color:#fff;padding:5px 14px;border-radius:6px;font-size:12px;font-family:var(--font);font-weight:500;cursor:pointer;}
   .refresh-btn:hover{background:rgba(255,255,255,.2);}
   .upload-panel{background:var(--surface);border-bottom:1px solid var(--border);padding:0 2rem;overflow:hidden;max-height:0;transition:max-height .3s ease,padding .3s ease;}
-  .upload-panel.open{max-height:260px;padding:1.25rem 2rem;}
+  .upload-panel.open{max-height:400px;padding:1.25rem 2rem;}
   .upload-grid{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px;}
   .upload-zone{border:1.5px dashed var(--border2);border-radius:8px;padding:1rem;text-align:center;cursor:pointer;transition:border-color .15s,background .15s;position:relative;}
   .upload-zone:hover,.upload-zone.over{border-color:var(--blue);background:var(--blue-light);}
@@ -380,7 +380,7 @@
 <div id="empty-state" class="empty-state">
   <h3>No data loaded yet</h3>
   <p>Click Refresh Data above to upload your CSV files.</p>
-  <button class="empty-cta" onclick="toggleUpload()">Upload CSV Files</button>
+  <button class="empty-cta" onclick="openUpload()">Upload CSV Files</button>
 </div>
 
 <script>
@@ -825,6 +825,8 @@ function renderStageAC(d){
 
 let uploadOpen=false;
 function toggleUpload(){uploadOpen=!uploadOpen;document.getElementById('upload-panel').classList.toggle('open',uploadOpen);}
+function openUpload(){uploadOpen=true;document.getElementById('upload-panel').classList.add('open');}
+
 function onDragOver(e,zone){e.preventDefault();document.getElementById('zone-'+zone).classList.add('over');}
 function onDragLeave(zone){document.getElementById('zone-'+zone).classList.remove('over');}
 function onDrop(e,zone){e.preventDefault();onDragLeave(zone);const file=e.dataTransfer.files[0];if(file)processFile(file,zone);}
@@ -847,7 +849,7 @@ function getFilters(){return{leadFrom:document.getElementById('f-lead-from').val
 function applyFilters(){if(!_rawLeads.length)return;const f=getFilters();const hasFilter=Object.values(f).some(v=>v);document.getElementById('filter-active-label').style.display=hasFilter?'inline-block':'none';dashData=computeDash(_rawLeads,_rawCombined,_rawPaid,_rawOpp,f);renderDash(dashData);}
 function resetFilters(){['f-lead-from','f-lead-to','f-trial-from','f-trial-to','f-pay-from','f-pay-to'].forEach(id=>{document.getElementById(id).value='';});document.getElementById('filter-active-label').style.display='none';applyFilters();}
 function showDash(){document.getElementById('empty-state').style.display='none';document.getElementById('main-content').style.display='block';document.getElementById('last-updated').textContent='Updated: '+(window._dashUpdated||'—');renderDash(dashData);}
-(function init(){localStorage.removeItem('cmDashData');})();
+(function init(){localStorage.removeItem('cmDashData');openUpload();})();
 </script>
 </body>
 </html>
