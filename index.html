@@ -705,10 +705,10 @@ function applyFilters(){if(!_rawLeads.length)return;var f=getFilters();var hasF=
 function resetFilters(){['f-lead-from','f-lead-to','f-trial-from','f-trial-to','f-pay-from','f-pay-to'].forEach(function(id){document.getElementById(id).value='';});document.getElementById('filter-active-label').style.display='none';applyFilters();}
 function showDash(){document.getElementById('empty-state').style.display='none';document.getElementById('main-content').style.display='block';document.getElementById('last-updated').textContent='Updated: '+(window._dashUpdated||'—');renderDash(dashData);}
 const SHEET_URLS = {
-  leads:    'https://docs.google.com/spreadsheets/d/1lcVEQv4ZGFR9aAHJA8xcIrk41Rrlw66X6NiI0FgbvRA/export?format=csv&gid=515519259',
-  combined: 'https://docs.google.com/spreadsheets/d/1lcVEQv4ZGFR9aAHJA8xcIrk41Rrlw66X6NiI0FgbvRA/export?format=csv&gid=2132705628',
-  opp:      'https://docs.google.com/spreadsheets/d/1lcVEQv4ZGFR9aAHJA8xcIrk41Rrlw66X6NiI0FgbvRA/export?format=csv&gid=1829818292',
-  paid:     'https://docs.google.com/spreadsheets/d/1Sz27HCizNxjhDCiQi2tLWme8pdiSOxhSACXy_hD_g2Q/export?format=csv&gid=311114984'
+  leads:    'https://api.allorigins.win/raw?url=https%3A%2F%2Fdocs.google.com%2Fspreadsheets%2Fd%2F1lcVEQv4ZGFR9aAHJA8xcIrk41Rrlw66X6NiI0FgbvRA%2Fexport%3Fformat%3Dcsv%26gid%3D515519259',
+  combined: 'https://api.allorigins.win/raw?url=https%3A%2F%2Fdocs.google.com%2Fspreadsheets%2Fd%2F1lcVEQv4ZGFR9aAHJA8xcIrk41Rrlw66X6NiI0FgbvRA%2Fexport%3Fformat%3Dcsv%26gid%3D2132705628',
+  opp:      'https://api.allorigins.win/raw?url=https%3A%2F%2Fdocs.google.com%2Fspreadsheets%2Fd%2F1lcVEQv4ZGFR9aAHJA8xcIrk41Rrlw66X6NiI0FgbvRA%2Fexport%3Fformat%3Dcsv%26gid%3D1829818292',
+  paid:     'https://api.allorigins.win/raw?url=https%3A%2F%2Fdocs.google.com%2Fspreadsheets%2Fd%2F1Sz27HCizNxjhDCiQi2tLWme8pdiSOxhSACXy_hD_g2Q%2Fexport%3Fformat%3Dcsv%26gid%3D311114984'
 };
 
 (function(){
