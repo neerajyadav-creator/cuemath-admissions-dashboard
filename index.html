@@ -333,14 +333,24 @@
     <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-bottom:8px;">Overall Performance</div>
     <div class="comp-strip" id="comp-strip"></div>
 
-    <!-- 4 Grouped bar charts -->
-    <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-bottom:8px;">AC-wise Comparison — Bar Charts</div>
-    <div id="comp-legend-bar" style="display:flex;gap:14px;margin-bottom:10px;align-items:center;"></div>
-    <div class="comp-charts-grid">
-      <div class="comp-chart-card"><div class="comp-chart-title">Paid Count by AC</div><div id="comp-paid-bars"></div></div>
-      <div class="comp-chart-card"><div class="comp-chart-title">Revenue by AC (₹L)</div><div id="comp-rev-bars"></div></div>
-      <div class="comp-chart-card"><div class="comp-chart-title">Trial Done (TD) by AC</div><div id="comp-td-bars"></div></div>
-      <div class="comp-chart-card"><div class="comp-chart-title">TD→Paid % by AC</div><div id="comp-tdp-bars"></div></div>
+    <!-- Overall line graphs -->
+    <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-bottom:8px;">Overall Performance — Period Comparison</div>
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:1.25rem 1.5rem;margin-bottom:1.5rem;">
+      <div id="comp-line-legend" style="display:flex;gap:20px;margin-bottom:14px;flex-wrap:wrap;"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;">
+        <div>
+          <div style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;">Cumulative Paid</div>
+          <svg id="lg-paid" viewBox="0 0 320 160" style="width:100%;height:160px;overflow:visible;"></svg>
+        </div>
+        <div>
+          <div style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;">Cumulative Revenue (₹L)</div>
+          <svg id="lg-rev" viewBox="0 0 320 160" style="width:100%;height:160px;overflow:visible;"></svg>
+        </div>
+        <div>
+          <div style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;">Running TD→Paid %</div>
+          <svg id="lg-tdp" viewBox="0 0 320 160" style="width:100%;height:160px;overflow:visible;"></svg>
+        </div>
+      </div>
     </div>
 
     <!-- AC Comparison Table -->
@@ -616,39 +626,93 @@ function renderPeriodComparison(){
     </div>`;
   }).join('');
 
-  // Grouped bar charts
-  const sortedAC=[...acComp].sort((a,b)=>b.p2.paid-a.p2.paid);
-
-  function renderGroupedBars(containerId,valFn,fmtFn){
-    const allVals=sortedAC.flatMap(r=>[valFn(r,'p1'),valFn(r,'p2')]);
-    const maxVal=Math.max(...allVals,0.001);
-    document.getElementById(containerId).innerHTML=sortedAC.map(r=>{
-      const v1=valFn(r,'p1'),v2=valFn(r,'p2');
-      const w1=Math.max(4,v1/maxVal*100).toFixed(1);const w2=Math.max(4,v2/maxVal*100).toFixed(1);
-      const gc=gainColor(v1,v2);const gp=gainPct(v1,v2);
-      return`<div class="grp-bar-wrap">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;">
-          <div class="grp-bar-name">${r.name.split(' ')[0]}</div>
-          <span style="font-size:10px;color:${gc};font-weight:700;">${gp}</span>
-        </div>
-        <div class="grp-bar-row">
-          <div class="grp-bar-period">P1</div>
-          <div class="grp-bar-track"><div class="grp-bar-fill" style="width:${w1}%;background:#1d3f8a;">${fmtFn(v1)}</div></div>
-          <div class="grp-bar-val">${fmtFn(v1)}</div>
-        </div>
-        <div class="grp-bar-row">
-          <div class="grp-bar-period">P2</div>
-          <div class="grp-bar-track"><div class="grp-bar-fill" style="width:${w2}%;background:#1a6b3c;">${fmtFn(v2)}</div></div>
-          <div class="grp-bar-val" style="font-weight:700;color:var(--text);">${fmtFn(v2)}</div>
-        </div>
-      </div>`;
-    }).join('');
+  // ── LINE GRAPHS: overall cumulative paid, revenue, TD→Paid% across both periods ──
+  // Build day-by-day series for each period using actual payment dates
+  function buildDailySeries(paidRows,dFrom,dTo){
+    // Get all days in range
+    const days=[];let cur=new Date(dFrom);
+    while(cur<=dTo){days.push(new Date(cur));cur.setDate(cur.getDate()+1);}
+    const dailyPaid={};const dailyRev={};
+    days.forEach(d=>{const k=d.toISOString().slice(0,10);dailyPaid[k]=0;dailyRev[k]=0;});
+    paidRows.forEach(r=>{
+      if(!MY_ACS.includes(r['ac_email']))return;
+      const dt=parsePayDate(r['Payment Date']);if(!dt)return;
+      const k=dt.toISOString().slice(0,10);
+      if(dailyPaid[k]!==undefined){dailyPaid[k]+=toNum(r['Paid Count']);dailyRev[k]+=toNum(r['amount_paid'])/100000;}
+    });
+    // Cumulative
+    let cumPaid=0,cumRev=0;
+    return days.map((d,i)=>{
+      const k=d.toISOString().slice(0,10);
+      cumPaid+=dailyPaid[k];cumRev+=Math.round((cumRev+dailyRev[k])*100)/100-cumRev+cumRev;
+      cumRev=Math.round((cumRev+dailyRev[k])*100)/100;
+      return{day:i+1,label:d.getDate()+' '+d.toLocaleString('en',{month:'short'}),cumPaid,cumRev:Math.round(cumRev*100)/100};
+    });
+  }
+  function buildTDPaidSeries(paidRows,combinedRows,dFrom,dTo){
+    const days=[];let cur=new Date(dFrom);
+    while(cur<=dTo){days.push(new Date(cur));cur.setDate(cur.getDate()+1);}
+    return days.map((d,i)=>{
+      const dayEnd=new Date(d);dayEnd.setHours(23,59,59);
+      const tdRows=combinedRows.filter(r=>{
+        if(!MY_ACS.includes(r['agent_email'])||r['demo_state']!=='DONE'||!r['demo_scheduled_date'])return false;
+        const dt=new Date(r['demo_scheduled_date']);return dt>=dFrom&&dt<=dayEnd;
+      });
+      const td=new Set(tdRows.map(r=>r['prospectid'])).size;
+      const pRows=paidRows.filter(r=>{if(!MY_ACS.includes(r['ac_email']))return false;const dt=parsePayDate(r['Payment Date']);return dt&&dt>=dFrom&&dt<=dayEnd;});
+      const paid=pRows.reduce((s,r)=>s+toNum(r['Paid Count']),0);
+      return{day:i+1,label:d.getDate()+' '+d.toLocaleString('en',{month:'short'}),tdPaid:td>0?Math.round(paid/td*10000)/100:0};
+    });
   }
 
-  renderGroupedBars('comp-paid-bars',(r,p)=>r[p].paid,v=>v);
-  renderGroupedBars('comp-rev-bars',(r,p)=>r[p].rev,v=>'₹'+v.toFixed(2)+'L');
-  renderGroupedBars('comp-td-bars',(r,p)=>r[p].td,v=>v);
-  renderGroupedBars('comp-tdp-bars',(r,p)=>r[p].tdPaid,v=>v.toFixed(2)+'%');
+  const s1=buildDailySeries(_rawPaid,dates.p1From,dates.p1To);
+  const s2=buildDailySeries(_rawPaid,dates.p2From,dates.p2To);
+  const tp1=buildTDPaidSeries(_rawPaid,_rawCombined,dates.p1From,dates.p1To);
+  const tp2=buildTDPaidSeries(_rawPaid,_rawCombined,dates.p2From,dates.p2To);
+
+  // Update legend
+  const legEl=document.getElementById('comp-line-legend');
+  if(legEl)legEl.innerHTML=`
+    <span style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:#1d3f8a;"><svg width="24" height="4"><line x1="0" y1="2" x2="24" y2="2" stroke="#1d3f8a" stroke-width="2.5"/></svg>${dates.p1Label}</span>
+    <span style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:#1a6b3c;"><svg width="24" height="4"><line x1="0" y1="2" x2="24" y2="2" stroke="#1a6b3c" stroke-width="2.5"/></svg>${dates.p2Label}</span>`;
+
+  function drawCompLine(svgId,series1,series2,valFn,fmtTip){
+    const svg=document.getElementById(svgId);if(!svg)return;
+    const W=320,H=160,pL=32,pR=10,pT=10,pB=24;
+    const w=W-pL-pR,h=H-pT-pB;
+    const allVals=[...series1,...series2].map(valFn);
+    const maxV=Math.max(...allVals,0.001);
+    const n1=series1.length,n2=series2.length;
+    const xOf=(i,n)=>pL+(n<=1?w/2:i/(n-1)*w);
+    const yOf=v=>pT+h-(v/maxV*h);
+    // grid
+    let html='';
+    [0,Math.round(maxV/2*10)/10,Math.round(maxV*10)/10].forEach(v=>{
+      const y=yOf(v);
+      html+=`<line x1="${pL}" y1="${y.toFixed(1)}" x2="${W-pR}" y2="${y.toFixed(1)}" stroke="#e2ddd8" stroke-width="1" stroke-dasharray="3,3"/>`;
+      html+=`<text x="${pL-3}" y="${(y+3).toFixed(1)}" text-anchor="end" font-size="8" fill="#9e9892" font-family="DM Mono">${fmtTip(v)}</text>`;
+    });
+    // x labels — show first, mid, last of each series
+    [[series1,'#1d3f8a'],[series2,'#1a6b3c']].forEach(([s,c])=>{
+      if(!s.length)return;
+      [0,Math.floor(s.length/2),s.length-1].forEach(i=>{
+        const x=xOf(i,s.length);
+        html+=`<text x="${x.toFixed(1)}" y="${H-6}" text-anchor="middle" font-size="8" fill="#9e9892" font-family="DM Mono">${s[i].label}</text>`;
+      });
+    });
+    // lines
+    [[series1,'#1d3f8a'],[series2,'#1a6b3c']].forEach(([s,c])=>{
+      if(!s.length)return;
+      const pts=s.map((d,i)=>`${xOf(i,s.length).toFixed(1)},${yOf(valFn(d)).toFixed(1)}`).join(' ');
+      html+=`<polyline points="${pts}" fill="none" stroke="${c}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
+      s.forEach((d,i)=>{const v=valFn(d);if(v>0||i===s.length-1)html+=`<circle cx="${xOf(i,s.length).toFixed(1)}" cy="${yOf(v).toFixed(1)}" r="3" fill="${c}"/><title>${d.label}: ${fmtTip(v)}</title>`;});
+    });
+    svg.innerHTML=html;
+  }
+
+  drawCompLine('lg-paid',s1,s2,d=>d.cumPaid,v=>v);
+  drawCompLine('lg-rev',s1,s2,d=>d.cumRev,v=>'₹'+v.toFixed(1)+'L');
+  drawCompLine('lg-tdp',tp1,tp2,d=>d.tdPaid,v=>v.toFixed(1)+'%');
 
   // AC detail table
   const teamRow={name:'Team Total',p1:tot1,p2:tot2,delta:{paid:tot2.paid-tot1.paid,rev:Math.round((tot2.rev-tot1.rev)*100)/100,td:tot2.td-tot1.td}};
