@@ -384,7 +384,7 @@ function computeDash(leadsRows,combinedRows,paidRows,oppRows,filters){
     if(MY_ACS.indexOf(r['agent_email'])<0)return false;
     if(toNum(r['Channel Check'])!==1)return false;if(toNum(r['Grade Check'])!==1)return false;
     if(toNum(r['CITY Check'])!==1)return false;if(toNum(r['DA Check'])!==1)return false;
-    if(toNum(r['BOARD Check'])!==1)return false;if(toNum(r['created by checker'])!==1)return false;
+    if(toNum(r['BOARD Check'])!==1)return false;if(toNum(r['created by check'])!==1)return false;
     if(leadFrom||leadTo){var ld=r['lead_created_date']?new Date(r['lead_created_date']):null;
       if(ld){if(leadFrom&&ld<leadFrom)return false;if(leadTo&&ld>leadTo)return false;}
       else if(r['lead_created_month']!==curMonth)return false;
@@ -393,19 +393,29 @@ function computeDash(leadsRows,combinedRows,paidRows,oppRows,filters){
   });
 
   var tsBase=combinedRows.filter(function(r){
-    if(MY_ACS.indexOf(r['agent_email'])<0)return false;if(r['demo_state']==='Future Scheduled')return false;
-    if(trialFrom||trialTo){var td=r['demo_scheduled_date']?new Date(r['demo_scheduled_date']):null;
-      if(td){if(trialFrom&&td<trialFrom)return false;if(trialTo&&td>trialTo)return false;}
-      else if(r['demo_month_3']!==curMonth)return false;
-    }else if(r['demo_month_3']!==curMonth)return false;
+    var email=r['owner_email']||r['agent_email'];
+    if(MY_ACS.indexOf(email)<0)return false;
+    if(toNum(r['Channel Check'])!==1||toNum(r['Grade Check'])!==1)return false;
+    if(toNum(r['is_trial_scheduled'])!==1&&toNum(r['is_trial_done'])!==1)return false;
+    var cm=r['created_month']||r['demo_month_3'];
+    if(trialFrom||trialTo){var d2=r['created_at']?new Date(r['created_at']):null;
+      if(d2){if(trialFrom&&d2<trialFrom)return false;if(trialTo&&d2>trialTo)return false;}
+      else if(cm!==curMonth)return false;
+    }else if(cm!==curMonth)return false;
+    r['agent_email']=email;
     return true;
   });
   var tdBase=combinedRows.filter(function(r){
-    if(MY_ACS.indexOf(r['agent_email'])<0)return false;if(r['demo_state']!=='DONE')return false;
-    if(trialFrom||trialTo){var td=r['demo_scheduled_date']?new Date(r['demo_scheduled_date']):null;
-      if(td){if(trialFrom&&td<trialFrom)return false;if(trialTo&&td>trialTo)return false;}
-      else if(r['demo_month_3']!==curMonth)return false;
-    }else if(r['demo_month_3']!==curMonth)return false;
+    var email=r['owner_email']||r['agent_email'];
+    if(MY_ACS.indexOf(email)<0)return false;
+    if(toNum(r['Channel Check'])!==1||toNum(r['Grade Check'])!==1)return false;
+    if(toNum(r['is_trial_done'])!==1)return false;
+    var cm=r['created_month']||r['demo_month_3'];
+    if(trialFrom||trialTo){var d2=r['created_at']?new Date(r['created_at']):null;
+      if(d2){if(trialFrom&&d2<trialFrom)return false;if(trialTo&&d2>trialTo)return false;}
+      else if(cm!==curMonth)return false;
+    }else if(cm!==curMonth)return false;
+    r['agent_email']=email;
     return true;
   });
 
@@ -430,9 +440,9 @@ function computeDash(leadsRows,combinedRows,paidRows,oppRows,filters){
 
   var acData=MY_ACS.map(function(email){
     var name=NAME_MAP[email];
-    var ql=qlBase.filter(function(r){return r['agent_email']===email;}).reduce(function(s,r){return s+toNum(r['qls_count']);},0);
-    var tsSet=new Set(tsBase.filter(function(r){return r['agent_email']===email;}).map(function(r){return r['prospectid'];}));
-    var tdSet=new Set(tdBase.filter(function(r){return r['agent_email']===email;}).map(function(r){return r['prospectid'];}));
+    var ql=qlBase.filter(function(r){return r['agent_email']===email;}).reduce(function(s,r){return s+toNum(r['ql']||r['qls_count']);},0);
+    var tsSet=new Set(tsBase.filter(function(r){return r['agent_email']===email;}).map(function(r){return r['opportunity_id']||r['prospectid'];}));
+    var tdSet=new Set(tdBase.filter(function(r){return r['agent_email']===email;}).map(function(r){return r['opportunity_id']||r['prospectid'];}));
     var pRows=paidBase.filter(function(r){return r['ac_email']===email;});
     var ts=tsSet.size,td=tdSet.size;
     var paid=pRows.reduce(function(s,r){return s+toNum(r['Paid Count']);},0);
@@ -451,7 +461,7 @@ function computeDash(leadsRows,combinedRows,paidRows,oppRows,filters){
     var qlR=qlBase.filter(function(r){return r['Channel Grouping ']==ch||r['Channel Grouping']==ch;});
     var tsR=tsBase.filter(function(r){return r['Channel Grouping ']==ch||r['Channel Grouping']==ch;});
     var tdR=tdBase.filter(function(r){return r['Channel Grouping ']==ch||r['Channel Grouping']==ch;});
-    var ql=qlR.reduce(function(s,r){return s+toNum(r['qls_count']);},0);
+    var ql=qlR.reduce(function(s,r){return s+toNum(r['ql']||r['qls_count']);},0);
     var ts=new Set(tsR.map(function(r){return r['prospectid'];})).size;
     var td=new Set(tdR.map(function(r){return r['prospectid'];})).size;
     var tdProspects=new Set(tdR.map(function(r){return r['prospectid'];}));
