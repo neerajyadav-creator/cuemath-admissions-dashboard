@@ -706,7 +706,7 @@ function resetFilters(){['f-lead-from','f-lead-to','f-trial-from','f-trial-to','
 function showDash(){document.getElementById('empty-state').style.display='none';document.getElementById('main-content').style.display='block';document.getElementById('last-updated').textContent='Updated: '+(window._dashUpdated||'—');renderDash(dashData);}
 
 // ── LIVE AUTO-FETCH ──
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwN1STOv44c-ktKj0v-_5RsZt3WU1XW0czkevTx_ANmvbQ3VU9MwDqWFQ-mWod5uRDj6w/exec';
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyb-ilIqj6XY_1WxSqglwIoqdk2soZdEowaMt8l0jpImhJg9e0WPWv9uWzKWf78rfZD7Q/exec';
 
 async function fetchSheet(sheetName) {
   var url = APPS_SCRIPT_URL + '?sheet=' + sheetName;
