@@ -347,7 +347,7 @@ function parseCSV(text){
   }
   return rows;
 }
-function toNum(v){if(v===undefined||v===null)return 0;return parseFloat(String(v).replace(/,/g,''))||0;}
+function toNum(v){if(v===undefined||v===null)return 0;var s=String(v).trim();if(s.toLowerCase()==='true')return 1;if(s.toLowerCase()==='false')return 0;return parseFloat(s.replace(/,/g,''))||0;}
 function parsePayDate(d){
   var months={jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11,january:0,february:1,march:2,april:3,june:5,july:6,august:7,september:8,october:9,november:10,december:11};
   var parts=String(d).trim().split(' ');if(parts.length<3)return null;
@@ -372,16 +372,8 @@ function computeDash(leadsRows,combinedRows,paidRows,oppRows,filters){
   var months=[];
   leadsRows.forEach(function(r){if(MY_ACS.indexOf(r['agent_email'])>=0&&months.indexOf(r['lead_created_month'])<0)months.push(r['lead_created_month']);});
   months.sort();
-  var curMonth=months[months.length-1];
-  // Also build a version for combined sheet (which uses YYYY-MM format like "2026-04")
-  var curMonthAlt=null;
-  if(curMonth){
-    // Try to convert "April 2026" -> "2026-04" or keep as-is if already YYYY-MM
-    var mNames={january:'01',february:'02',march:'03',april:'04',may:'05',june:'06',july:'07',august:'08',september:'09',october:'10',november:'11',december:'12'};
-    var mp=curMonth.toLowerCase().split(' ');
-    if(mp.length===2&&mNames[mp[0]]){curMonthAlt=mp[1]+'-'+mNames[mp[0]];}
-    else{curMonthAlt=curMonth;}
-  }
+  var curMonth=months[months.length-1]; // format: "2026-04"
+  var curMonthAlt=curMonth; // same format in both sheets
   var maxDate=null;
   paidRows.forEach(function(r){var d=parsePayDate(r['Payment Date']);if(d&&(!maxDate||d>maxDate))maxDate=d;});
   var cutoffStr=maxDate?maxDate.getDate()+' '+maxDate.toLocaleString('en',{month:'short'})+' '+maxDate.getFullYear():'—';
@@ -389,12 +381,21 @@ function computeDash(leadsRows,combinedRows,paidRows,oppRows,filters){
   var trialFrom=parseDateStr(filters.trialFrom),trialTo=parseDateStr(filters.trialTo);
   var payFrom=parseDateStr(filters.payFrom),payTo=parseDateStr(filters.payTo);
 
+  // qlBase = ALL agents passing 6 checks in curMonth (per master tracker formula)
+  var _apr=leadsRows.filter(function(r){return r['lead_created_month']===curMonth;});
+  var _ch=_apr.filter(function(r){return toNum(r['channel check']||r['Channel Check']||r['AC Channel Check'])===1;});
+  var _gr=_ch.filter(function(r){return toNum(r['Grade Check'])===1;});
+  var _cy=_gr.filter(function(r){return toNum(r['CITY Check'])===1;});
+  var _da=_cy.filter(function(r){return toNum(r['DA Check'])===1;});
+  var _bd=_da.filter(function(r){return toNum(r['BOARD Check'])===1;});
+  var _cr=_bd.filter(function(r){return toNum(r['created by check']||r['Owner Check'])===1;});
+  window._qlDebug='apr='+_apr.length+' ch='+_ch.length+' gr='+_gr.length+' cy='+_cy.length+' da='+_da.length+' bd='+_bd.length+' cr='+_cr.length;
   var qlBase=leadsRows.filter(function(r){
-    if(MY_ACS.indexOf(r['agent_email'])<0)return false;
-    var chk=toNum(r['Channel Check']||r['channel check']||r['AC Channel Check']);
+    var chk=toNum(r['channel check']||r['Channel Check']||r['AC Channel Check']);
     if(chk!==1)return false;
     if(toNum(r['Grade Check'])!==1)return false;
-    if(toNum(r['CITY Check'])!==1)return false;if(toNum(r['DA Check'])!==1)return false;
+    if(toNum(r['CITY Check'])!==1)return false;
+    if(toNum(r['DA Check'])!==1)return false;
     if(toNum(r['BOARD Check'])!==1)return false;
     var crChk=toNum(r['created by check']||r['Owner Check']);
     if(crChk!==1)return false;
@@ -404,6 +405,8 @@ function computeDash(leadsRows,combinedRows,paidRows,oppRows,filters){
     }else if(r['lead_created_month']!==curMonth)return false;
     return true;
   });
+  // qlBaseAC = only MY_ACS for AC-wise breakdown
+  var qlBaseAC=qlBase.filter(function(r){return MY_ACS.indexOf(r['agent_email'])>=0;});
 
   // TS = trial scheduled in April (use leads sheet which has demo_month_3)
   var tsBase=leadsRows.filter(function(r){
@@ -450,7 +453,7 @@ function computeDash(leadsRows,combinedRows,paidRows,oppRows,filters){
 
   var acData=MY_ACS.map(function(email){
     var name=NAME_MAP[email];
-    var ql=qlBase.filter(function(r){return r['agent_email']===email;}).length;
+    var ql=qlBaseAC.filter(function(r){return r['agent_email']===email;}).length;
     var tsSet=new Set(tsBase.filter(function(r){return r['agent_email']===email;}).map(function(r){return r['prospectid'];}));
     var tdSet=new Set(tdBase.filter(function(r){return r['agent_email']===email;}).map(function(r){return r['prospectid'];}));
     var pRows=paidBase.filter(function(r){return r['ac_email']===email;});
@@ -480,7 +483,7 @@ function computeDash(leadsRows,combinedRows,paidRows,oppRows,filters){
     return{name:CAMP_LABELS[ch]||ch,ql:ql,ts:ts,td:td,paid:paid};
   }).filter(function(r){return r.ql>0||r.ts>0;});
 
-  var totQL=acData.reduce(function(s,r){return s+r.ql;},0);
+  var totQL=qlBase.length; // all agents, 6 checks
   var totTS=acData.reduce(function(s,r){return s+r.ts;},0);
   var totTD=acData.reduce(function(s,r){return s+r.td;},0);
   var totPaid=acData.reduce(function(s,r){return s+r.paid;},0);
@@ -488,7 +491,7 @@ function computeDash(leadsRows,combinedRows,paidRows,oppRows,filters){
   var totCPW2=acData.reduce(function(s,r){return s+r.cpw2;},0);
   var totCPW3=acData.reduce(function(s,r){return s+r.cpw3;},0);
   var hasOppData=acData.some(function(r){return r.hasOpp;});
-  return{curMonth:curMonth,cutoffStr:cutoffStr,acData:acData,campData:campData,totQL:totQL,totTS:totTS,totTD:totTD,totPaid:totPaid,totRev:totRev,totCPW2:totCPW2,totCPW3:totCPW3,hasOppData:hasOppData};
+  return{curMonth:curMonth,cutoffStr:cutoffStr,acData:acData,campData:campData,totQL:totQL,totTS:totTS,totTD:totTD,totPaid:totPaid,totRev:totRev,totCPW2:totCPW2,totCPW3:totCPW3,hasOppData:hasOppData,qlRaw:qlBase.length,qlAC:qlBaseAC.length,tsAll:tsBase.length,qlDebug:window._qlDebug||''};
 }
 
 function renderBarsEl(id,data,valFn,color,lblFn){
@@ -501,7 +504,7 @@ function renderBarsEl(id,data,valFn,color,lblFn){
 }
 
 function renderDash(d){
-  document.getElementById('sources-row').innerHTML='<span class="src-tag"><span class="src-dot" style="background:#1d3f8a;"></span>QL — Leads · 6 checks</span><span class="src-tag"><span class="src-dot" style="background:#1a6b3c;"></span>TS/TD — Combined · '+d.curMonth+'</span><span class="src-tag"><span class="src-dot" style="background:#8b1a1a;"></span>Paid — till '+d.cutoffStr+'</span>';
+  document.getElementById('sources-row').innerHTML='<span class="src-tag"><span class="src-dot" style="background:#1d3f8a;"></span>QL — Leads · 6 checks · month='+d.curMonth+'</span><span class="src-tag"><span class="src-dot" style="background:#1a6b3c;"></span>TS/TD — demo_month_3='+d.curMonth+'</span><span class="src-tag"><span class="src-dot" style="background:#8b1a1a;"></span>Paid — till '+d.cutoffStr+'</span><span class="src-tag" style="color:red;">qlBase='+d.qlRaw+' qlAC='+d.qlAC+' tsAll='+d.tsAll+' | '+d.qlDebug+'</span>';
   var abv=d.totPaid>0?'₹'+(d.totRev/d.totPaid).toFixed(1)+'L':'—';
   document.getElementById('summary-grid').innerHTML='<div class="metric-card"><div class="metric-label">Total QLs</div><div class="metric-val">'+d.totQL.toLocaleString()+'</div><div class="metric-sub">6 checks</div></div><div class="metric-card"><div class="metric-label">Trial Scheduled</div><div class="metric-val">'+d.totTS.toLocaleString()+'</div><div class="metric-sub">QL→TS: '+pct(d.totTS,d.totQL)+'%</div></div><div class="metric-card"><div class="metric-label">Trial Done</div><div class="metric-val">'+d.totTD.toLocaleString()+'</div><div class="metric-sub">TS→TD: '+pct(d.totTD,d.totTS)+'%</div></div><div class="metric-card"><div class="metric-label">Paid</div><div class="metric-val">'+d.totPaid+'</div><div class="metric-sub">of '+d.totTD+' TDs</div></div><div class="metric-card" style="border-color:#8b1a1a;background:#faeaea;"><div class="metric-label" style="color:#8b1a1a;">TD→Paid %</div><div class="metric-val" style="color:#8b1a1a;">'+pct(d.totPaid,d.totTD)+'%</div><div class="metric-sub">Plan: 18%</div></div><div class="metric-card highlight"><div class="metric-label">Revenue</div><div class="metric-val">'+fmtRev(d.totRev)+'</div><div class="metric-sub">ABV '+abv+'</div></div>';
 
@@ -726,7 +729,7 @@ function resetFilters(){['f-lead-from','f-lead-to','f-trial-from','f-trial-to','
 function showDash(){document.getElementById('empty-state').style.display='none';document.getElementById('main-content').style.display='block';document.getElementById('last-updated').textContent='Updated: '+(window._dashUpdated||'—');renderDash(dashData);}
 
 // ── LIVE AUTO-FETCH ──
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyb-ilIqj6XY_1WxSqglwIoqdk2soZdEowaMt8l0jpImhJg9e0WPWv9uWzKWf78rfZD7Q/exec';
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbygvKk5uP31hr6qLU__O2zNNzY3GKCDg_yaagMdScfclDLauBcf8OFeLiISadYCIf8ANA/exec';
 
 async function fetchSheet(sheetName) {
   var url = APPS_SCRIPT_URL + '?sheet=' + sheetName;
