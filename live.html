@@ -373,6 +373,15 @@ function computeDash(leadsRows,combinedRows,paidRows,oppRows,filters){
   leadsRows.forEach(function(r){if(MY_ACS.indexOf(r['agent_email'])>=0&&months.indexOf(r['lead_created_month'])<0)months.push(r['lead_created_month']);});
   months.sort();
   var curMonth=months[months.length-1];
+  // Also build a version for combined sheet (which uses YYYY-MM format like "2026-04")
+  var curMonthAlt=null;
+  if(curMonth){
+    // Try to convert "April 2026" -> "2026-04" or keep as-is if already YYYY-MM
+    var mNames={january:'01',february:'02',march:'03',april:'04',may:'05',june:'06',july:'07',august:'08',september:'09',october:'10',november:'11',december:'12'};
+    var mp=curMonth.toLowerCase().split(' ');
+    if(mp.length===2&&mNames[mp[0]]){curMonthAlt=mp[1]+'-'+mNames[mp[0]];}
+    else{curMonthAlt=curMonth;}
+  }
   var maxDate=null;
   paidRows.forEach(function(r){var d=parsePayDate(r['Payment Date']);if(d&&(!maxDate||d>maxDate))maxDate=d;});
   var cutoffStr=maxDate?maxDate.getDate()+' '+maxDate.toLocaleString('en',{month:'short'})+' '+maxDate.getFullYear():'—';
@@ -382,9 +391,13 @@ function computeDash(leadsRows,combinedRows,paidRows,oppRows,filters){
 
   var qlBase=leadsRows.filter(function(r){
     if(MY_ACS.indexOf(r['agent_email'])<0)return false;
-    if(toNum(r['Channel Check'])!==1)return false;if(toNum(r['Grade Check'])!==1)return false;
+    var chk=toNum(r['Channel Check']||r['channel check']||r['AC Channel Check']);
+    if(chk!==1)return false;
+    if(toNum(r['Grade Check'])!==1)return false;
     if(toNum(r['CITY Check'])!==1)return false;if(toNum(r['DA Check'])!==1)return false;
-    if(toNum(r['BOARD Check'])!==1)return false;if(toNum(r['created by check'])!==1)return false;
+    if(toNum(r['BOARD Check'])!==1)return false;
+    var crChk=toNum(r['created by check']||r['Owner Check']);
+    if(crChk!==1)return false;
     if(leadFrom||leadTo){var ld=r['lead_created_date']?new Date(r['lead_created_date']):null;
       if(ld){if(leadFrom&&ld<leadFrom)return false;if(leadTo&&ld>leadTo)return false;}
       else if(r['lead_created_month']!==curMonth)return false;
@@ -392,30 +405,27 @@ function computeDash(leadsRows,combinedRows,paidRows,oppRows,filters){
     return true;
   });
 
-  var tsBase=combinedRows.filter(function(r){
-    var email=r['owner_email']||r['agent_email'];
-    if(MY_ACS.indexOf(email)<0)return false;
-    if(toNum(r['Channel Check'])!==1||toNum(r['Grade Check'])!==1)return false;
-    if(toNum(r['is_trial_scheduled'])!==1&&toNum(r['is_trial_done'])!==1)return false;
-    var cm=r['created_month']||r['demo_month_3'];
-    if(trialFrom||trialTo){var d2=r['created_at']?new Date(r['created_at']):null;
+  // TS = trial scheduled in April (use leads sheet which has demo_month_3)
+  var tsBase=leadsRows.filter(function(r){
+    if(MY_ACS.indexOf(r['agent_email'])<0)return false;
+    if(!r['demo_month_3']||r['demo_month_3']!==curMonth)return false;
+    var st=r['demo_state']||'';
+    if(!st||st===''||st==='Not Scheduled')return false;
+    if(trialFrom||trialTo){
+      var d2=r['demo_scheduled_date']?new Date(r['demo_scheduled_date']):null;
       if(d2){if(trialFrom&&d2<trialFrom)return false;if(trialTo&&d2>trialTo)return false;}
-      else if(cm!==curMonth)return false;
-    }else if(cm!==curMonth)return false;
-    r['agent_email']=email;
+    }
     return true;
   });
-  var tdBase=combinedRows.filter(function(r){
-    var email=r['owner_email']||r['agent_email'];
-    if(MY_ACS.indexOf(email)<0)return false;
-    if(toNum(r['Channel Check'])!==1||toNum(r['Grade Check'])!==1)return false;
-    if(toNum(r['is_trial_done'])!==1)return false;
-    var cm=r['created_month']||r['demo_month_3'];
-    if(trialFrom||trialTo){var d2=r['created_at']?new Date(r['created_at']):null;
+  // TD = trial done in April
+  var tdBase=leadsRows.filter(function(r){
+    if(MY_ACS.indexOf(r['agent_email'])<0)return false;
+    if(!r['demo_month_3']||r['demo_month_3']!==curMonth)return false;
+    if((r['demo_state']||'')!=='DONE')return false;
+    if(trialFrom||trialTo){
+      var d2=r['demo_scheduled_date']?new Date(r['demo_scheduled_date']):null;
       if(d2){if(trialFrom&&d2<trialFrom)return false;if(trialTo&&d2>trialTo)return false;}
-      else if(cm!==curMonth)return false;
-    }else if(cm!==curMonth)return false;
-    r['agent_email']=email;
+    }
     return true;
   });
 
@@ -436,13 +446,13 @@ function computeDash(leadsRows,combinedRows,paidRows,oppRows,filters){
   var tdSids={};MY_ACS.forEach(function(e){tdSids[e]=new Set();});
   tdBase.forEach(function(r){var e=r['agent_email'];if(e&&tdSids[e]&&r['stud_id'])tdSids[e].add(r['stud_id']);});
   var futSids={};MY_ACS.forEach(function(e){futSids[e]=new Set();});
-  combinedRows.filter(function(r){return r['demo_month_3']===curMonth&&r['demo_state']==='Future Scheduled'&&MY_ACS.indexOf(r['agent_email'])>=0;}).forEach(function(r){if(r['stud_id'])futSids[r['agent_email']].add(r['stud_id']);});
+  leadsRows.filter(function(r){return r['demo_month_3']===curMonth&&r['demo_state']==='Future Scheduled'&&MY_ACS.indexOf(r['agent_email'])>=0;}).forEach(function(r){if(r['stud_id'])futSids[r['agent_email']].add(r['stud_id']);});
 
   var acData=MY_ACS.map(function(email){
     var name=NAME_MAP[email];
-    var ql=qlBase.filter(function(r){return r['agent_email']===email;}).reduce(function(s,r){return s+toNum(r['ql']||r['qls_count']);},0);
-    var tsSet=new Set(tsBase.filter(function(r){return r['agent_email']===email;}).map(function(r){return r['opportunity_id']||r['prospectid'];}));
-    var tdSet=new Set(tdBase.filter(function(r){return r['agent_email']===email;}).map(function(r){return r['opportunity_id']||r['prospectid'];}));
+    var ql=qlBase.filter(function(r){return r['agent_email']===email;}).length;
+    var tsSet=new Set(tsBase.filter(function(r){return r['agent_email']===email;}).map(function(r){return r['prospectid'];}));
+    var tdSet=new Set(tdBase.filter(function(r){return r['agent_email']===email;}).map(function(r){return r['prospectid'];}));
     var pRows=paidBase.filter(function(r){return r['ac_email']===email;});
     var ts=tsSet.size,td=tdSet.size;
     var paid=pRows.reduce(function(s,r){return s+toNum(r['Paid Count']);},0);
@@ -459,8 +469,8 @@ function computeDash(leadsRows,combinedRows,paidRows,oppRows,filters){
 
   var campData=CAMPAIGN_ORDER.map(function(ch){
     var qlR=qlBase.filter(function(r){return r['Channel Grouping ']==ch||r['Channel Grouping']==ch;});
-    var tsR=tsBase.filter(function(r){return r['Channel Grouping ']==ch||r['Channel Grouping']==ch;});
-    var tdR=tdBase.filter(function(r){return r['Channel Grouping ']==ch||r['Channel Grouping']==ch;});
+    var tsR=tsBase.filter(function(r){var cg=r['Channel Grouping']||r['Channel Grouping ']||'';return cg==ch;});
+    var tdR=tdBase.filter(function(r){var cg=r['Channel Grouping']||r['Channel Grouping ']||'';return cg==ch;});
     var ql=qlR.reduce(function(s,r){return s+toNum(r['ql']||r['qls_count']);},0);
     var ts=new Set(tsR.map(function(r){return r['prospectid'];})).size;
     var td=new Set(tdR.map(function(r){return r['prospectid'];})).size;
