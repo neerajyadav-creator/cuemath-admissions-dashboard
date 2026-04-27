@@ -347,7 +347,7 @@ function parseCSV(text){
   }
   return rows;
 }
-function toNum(v){if(v===undefined||v===null)return 0;var s=String(v).trim();if(s.toLowerCase()==='true')return 1;if(s.toLowerCase()==='false')return 0;return parseFloat(s.replace(/,/g,''))||0;}
+function toNum(v){if(v===undefined||v===null)return 0;var s=String(v).trim();if(s.toLowerCase()==='true')return 1;if(s.toLowerCase()==='false'||s==='#N/A'||s===''||s==='FALSE')return 0;return parseFloat(s.replace(/,/g,''))||0;}
 function parsePayDate(d){
   var months={jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11,january:0,february:1,march:2,april:3,june:5,july:6,august:7,september:8,october:9,november:10,december:11};
   var parts=String(d).trim().split(' ');if(parts.length<3)return null;
@@ -369,11 +369,14 @@ function deltaPill(val,isRev){
 
 function computeDash(leadsRows,combinedRows,paidRows,oppRows,filters){
   oppRows=oppRows||[];filters=filters||{};
+  // curMonth = current calendar month in YYYY-MM format (e.g. "2026-04")
+  var _now=new Date();
+  var curMonth=_now.getFullYear()+'-'+String(_now.getMonth()+1).padStart(2,'0');
+  var curMonthAlt=curMonth;
+  // Build months list for reference
   var months=[];
   leadsRows.forEach(function(r){if(MY_ACS.indexOf(r['agent_email'])>=0&&months.indexOf(r['lead_created_month'])<0)months.push(r['lead_created_month']);});
   months.sort();
-  var curMonth=months[months.length-1]; // format: "2026-04"
-  var curMonthAlt=curMonth; // same format in both sheets
   var maxDate=null;
   paidRows.forEach(function(r){var d=parsePayDate(r['Payment Date']);if(d&&(!maxDate||d>maxDate))maxDate=d;});
   var cutoffStr=maxDate?maxDate.getDate()+' '+maxDate.toLocaleString('en',{month:'short'})+' '+maxDate.getFullYear():'—';
@@ -729,7 +732,7 @@ function resetFilters(){['f-lead-from','f-lead-to','f-trial-from','f-trial-to','
 function showDash(){document.getElementById('empty-state').style.display='none';document.getElementById('main-content').style.display='block';document.getElementById('last-updated').textContent='Updated: '+(window._dashUpdated||'—');renderDash(dashData);}
 
 // ── LIVE AUTO-FETCH ──
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbygvKk5uP31hr6qLU__O2zNNzY3GKCDg_yaagMdScfclDLauBcf8OFeLiISadYCIf8ANA/exec';
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyCML0wcLTz5Re3II4F3BoTA4QY2I_mCATyyFBrAYB8PLvF2Dj24aKaMactOoGvdfx3XA/exec';
 
 async function fetchSheet(sheetName) {
   var url = APPS_SCRIPT_URL + '?sheet=' + sheetName;
