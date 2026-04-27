@@ -778,9 +778,11 @@ const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyCML0wcLTz5Re3
 async function fetchSheet(sheetName) {
   var now = new Date();
   var month = now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
-  var url = APPS_SCRIPT_URL + '?sheet=' + sheetName + '&month=' + month;
-  var res = await fetch(url, {signal: AbortSignal.timeout(30000)});
-  if (!res.ok) throw new Error('Sheet fetch failed — check sharing settings');
+  var directUrl = APPS_SCRIPT_URL + '?sheet=' + sheetName + '&month=' + month;
+  // Wrap in allorigins to handle CORS redirect from Apps Script
+  var url = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(directUrl);
+  var res = await fetch(url, {signal: AbortSignal.timeout(45000)});
+  if (!res.ok) throw new Error('Sheet fetch failed');
   var text = await res.text();
   if (!text || text.length < 10) throw new Error('Empty response for ' + sheetName);
   return text;
