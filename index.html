@@ -131,7 +131,7 @@
   <div><div class="topbar-title">Cuemath India Admissions · April 2026 MTD</div></div>
   <div class="topbar-right">
     <span id="last-updated">No data loaded</span>
-    <button class="refresh-btn" id="auto-fetch-btn" onclick="autoFetch()">↻ Refresh Data</button>
+    <button class="refresh-btn" onclick="toggleUpload()">↻ Refresh Data</button>
   </div>
 </div>
 
@@ -704,60 +704,7 @@ function getFilters(){return{leadFrom:document.getElementById('f-lead-from').val
 function applyFilters(){if(!_rawLeads.length)return;var f=getFilters();var hasF=Object.values(f).some(function(v){return v;});document.getElementById('filter-active-label').style.display=hasF?'inline-block':'none';dashData=computeDash(_rawLeads,_rawCombined,_rawPaid,_rawOpp,f);renderDash(dashData);}
 function resetFilters(){['f-lead-from','f-lead-to','f-trial-from','f-trial-to','f-pay-from','f-pay-to'].forEach(function(id){document.getElementById(id).value='';});document.getElementById('filter-active-label').style.display='none';applyFilters();}
 function showDash(){document.getElementById('empty-state').style.display='none';document.getElementById('main-content').style.display='block';document.getElementById('last-updated').textContent='Updated: '+(window._dashUpdated||'—');renderDash(dashData);}
-const SHEET_URLS = {
-  leads:    'https://api.allorigins.win/raw?url=https%3A%2F%2Fdocs.google.com%2Fspreadsheets%2Fd%2F1lcVEQv4ZGFR9aAHJA8xcIrk41Rrlw66X6NiI0FgbvRA%2Fexport%3Fformat%3Dcsv%26gid%3D515519259',
-  combined: 'https://api.allorigins.win/raw?url=https%3A%2F%2Fdocs.google.com%2Fspreadsheets%2Fd%2F1lcVEQv4ZGFR9aAHJA8xcIrk41Rrlw66X6NiI0FgbvRA%2Fexport%3Fformat%3Dcsv%26gid%3D2132705628',
-  opp:      'https://api.allorigins.win/raw?url=https%3A%2F%2Fdocs.google.com%2Fspreadsheets%2Fd%2F1lcVEQv4ZGFR9aAHJA8xcIrk41Rrlw66X6NiI0FgbvRA%2Fexport%3Fformat%3Dcsv%26gid%3D1829818292',
-  paid:     'https://api.allorigins.win/raw?url=https%3A%2F%2Fdocs.google.com%2Fspreadsheets%2Fd%2F1Sz27HCizNxjhDCiQi2tLWme8pdiSOxhSACXy_hD_g2Q%2Fexport%3Fformat%3Dcsv%26gid%3D311114984'
-};
-
-(function(){
-  localStorage.removeItem('cmDashData');
-  autoFetch();
-})();
-
-async function autoFetch(){
-  const btn=document.getElementById('auto-fetch-btn');
-  if(btn){btn.textContent='⏳ Loading...';btn.disabled=true;}
-  document.getElementById('empty-state').style.display='block';
-  document.getElementById('empty-state').innerHTML='<h3>Loading data from Google Sheets...</h3><p style="font-size:13px;color:var(--text3);margin-top:8px;">Fetching latest data automatically. Please wait.</p>';
-  document.getElementById('main-content').style.display='none';
-
-  try {
-    const [leadsRes, combinedRes, paidRes, oppRes] = await Promise.all([
-      fetch(SHEET_URLS.leads),
-      fetch(SHEET_URLS.combined),
-      fetch(SHEET_URLS.paid),
-      fetch(SHEET_URLS.opp).catch(()=>null)
-    ]);
-
-    if(!leadsRes.ok||!combinedRes.ok||!paidRes.ok){
-      throw new Error('Failed to fetch one or more sheets. Check sheet sharing settings.');
-    }
-
-    const [leadsText, combinedText, paidText] = await Promise.all([
-      leadsRes.text(), combinedRes.text(), paidRes.text()
-    ]);
-    const oppText = oppRes && oppRes.ok ? await oppRes.text() : null;
-
-    _rawLeads    = parseCSV(leadsText);
-    _rawCombined = parseCSV(combinedText);
-    _rawPaid     = parseCSV(paidText);
-    _rawOpp      = oppText ? parseCSV(oppText) : [];
-
-    dashData = computeDash(_rawLeads,_rawCombined,_rawPaid,_rawOpp,{});
-    window._dashUpdated = new Date().toLocaleString('en-IN');
-    showDash();
-    if(btn){btn.textContent='↻ Refresh Data';btn.disabled=false;}
-  } catch(err) {
-    document.getElementById('empty-state').innerHTML=
-      '<h3 style="color:var(--red);">Could not load data</h3>' +
-      '<p style="font-size:13px;color:var(--text3);margin-top:8px;">'+err.message+'</p>' +
-      '<p style="font-size:12px;color:var(--text3);margin-top:8px;">Make sure both Google Sheets are shared as <strong>Anyone with link → Viewer</strong>.</p>' +
-      '<button class="empty-cta" onclick="toggleUpload()" style="margin-top:1rem;">Upload CSV manually instead</button>';
-    if(btn){btn.textContent='↻ Retry';btn.disabled=false;btn.onclick=autoFetch;}
-  }
-}
+(function(){localStorage.removeItem('cmDashData');})();
 </script>
 </body>
 </html>
