@@ -773,15 +773,13 @@ function resetFilters(){['f-lead-from','f-lead-to','f-trial-from','f-trial-to','
 function showDash(){document.getElementById('empty-state').style.display='none';document.getElementById('main-content').style.display='block';document.getElementById('last-updated').textContent='Updated: '+(window._dashUpdated||'—');renderDash(dashData);}
 
 // ── LIVE AUTO-FETCH ──
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyCML0wcLTz5Re3II4F3BoTA4QY2I_mCATyyFBrAYB8PLvF2Dj24aKaMactOoGvdfx3XA/exec';
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzBxHKhYYqGuk27OjaiCbAlYPyCxIIOd7odR622HIlzUdnCNxIK7BJ9g7zdLTwQt80N8A/exec';
 
 async function fetchSheet(sheetName) {
   var now = new Date();
   var month = now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
-  var directUrl = APPS_SCRIPT_URL + '?sheet=' + sheetName + '&month=' + month;
-  // Wrap in allorigins to handle CORS redirect from Apps Script
-  var url = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(directUrl);
-  var res = await fetch(url, {signal: AbortSignal.timeout(45000)});
+  var url = APPS_SCRIPT_URL + '?sheet=' + sheetName + '&month=' + month;
+  var res = await fetch(url, {signal: AbortSignal.timeout(45000), redirect: 'follow'});
   if (!res.ok) throw new Error('Sheet fetch failed');
   var text = await res.text();
   if (!text || text.length < 10) throw new Error('Empty response for ' + sheetName);
